@@ -1,11 +1,13 @@
 package  scala
 import entity.SpaceObject as SpaceObject
 import entity.Room as Room
-import entity.{Person, Item,Player}
+import entity.{Person, Item,Player,wall}
 @main def hello(): Unit = {
         val space = new Room[SpaceObject](5,5)
         space.place_object_random(Person("Alice"))
         space.place_object_random(Item("key"))
+        space.place_object_random(Item("sword"))
+        space.place_object_random(Wall("level_1"))
         val player :Player = Player(space.get_object_by_type("Person"), "Warrior")
         space.removeObject(Person("Alice"))
         player.movePlayer(space.get_space,1,1)

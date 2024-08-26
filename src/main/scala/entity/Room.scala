@@ -76,7 +76,6 @@ def displaySpace(): Unit = {
       print(formatCell(cellContent))
     }
 
-    // End of row with a 3D shadow effect
     println("|")
     println(" " * indent + ("_" * (width * cellWidth + width + 1)))
   }
