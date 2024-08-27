@@ -12,29 +12,42 @@ trait SpaceObject {
 }
 
 trait CombatStyle {
-  def performAttack(obj1: Option[SpaceObject], obj2: Option[SpaceObject]): Boolean = {
-    val attacker = obj1.getOrElse(throw new IllegalArgumentException("Attacker not found"))
-    val defender = obj2.getOrElse(throw new IllegalArgumentException("Defender not found"))
+ def performAttack(obj1: Option[SpaceObject], obj2: Option[SpaceObject]): Boolean = {
+  // Pattern matching to extract attacker and defender
+  (obj1, obj2) match {
+    case (Some(attacker: Player[_]), Some(defender)) =>
+      println(s"${attacker.get_name} attacks ${defender.get_name}")
 
-    println(s"${attacker.get_name} attacks ${defender.get_name}")
-    
-    if (attacker.getLevel >= defender.getLevel) {
-      val newStamina = attacker.getStamina - defender.action.increment_exp
-      attacker match {
-        case p: Player => p.setStamina(newStamina)
-        case _ => println("Cannot set stamina for this type")
+      // Check if the attacker can attack the defender based on levels
+      if (attacker.getLevel >= defender.getLevel) {
+        // Calculate new stamina after the attack
+        val newStamina = attacker.getStamina - defender.action.increment_exp
+
+        // Update stamina if attacker is a Player
+        attacker.setStamina(newStamina)
+
+        println(s"Attacker ${attacker.get_name} has attacked defender ${defender.get_name}")
+        true
+      } else {
+        println("Player Warning\n---------------->")
+        println("You can't attack this level\n---------------->")
+        false
       }
-      println(s"the attacker ${attacker.get_name} has attacked the defender ${defender.get_name}\n")
-      true
-    } 
-    else {
-      println("Player Warning\n---------------->")
-      println("You can't attack this level\n---------------->")
-      false
-    
 
-    }
+    case (Some(_: Player[_]), None) =>
+      println("Defender not found.")
+      false
+
+    case (None, Some(_)) =>
+      println("Attacker not found.")
+      false
+
+    case _ =>
+      println("Both attacker and defender not found.")
+      false
   }
+}
+
 } 
 
 class Move(val name: String, val increment_exp: Int = 0)
@@ -83,7 +96,7 @@ case class Monster(name: String, level: Int, exp: Float, stamina: Int = 5) exten
   override def action: Move = moves(Random.nextInt(moves.size))
 }
 
-class Player(val person: Option[SpaceObject], val role: String, val level: Int, val reward: List[Float], var stamina: Int = 10) extends SpaceObject  ,CombatStyle{
+class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String, val level: Int, val reward: List[Float]=List[Float](), var stamina: Int = 10) extends SpaceObject  ,CombatStyle{
   val moves: List[Move] = List(
     new Move("EnergyBlast", 3),
     new Move("FlashStrike", 1),
@@ -103,31 +116,60 @@ class Player(val person: Option[SpaceObject], val role: String, val level: Int, 
   println(f"Player name is ${get_name} and role is ${role} and level is ${level}")
   override def get_object_type: String = "Player"
 
-  def movePlayer(space: Array[Array[Option[SpaceObject]]], x: Int, y: Int,prev_x:Int,prev_y :Int ): Unit = {
-    if (x < 0 || x >= space.length || y < 0 || y >= space(0).length) {
-      throw new IllegalArgumentException("Invalid coordinates")
-    } else {
-      if (space(x)(y).isEmpty) {
-        for {
-          i <- space.indices
-          j <- space(i).indices
-          if space(i)(j).contains(this)
-        } space(i)(j) = None
-        space(x)(y) = Some(this)
-      } else {
-        val player =space(prev_x)(prev_y).getOrElse(throw new IllegalArgumentException("Player not found"))
-        val unknown_object = space(x)(y).getOrElse(throw new IllegalArgumentException("Object not found"))
-        val battle=performAttack(Some(player), Some(unknown_object))
-        if (battle == true) space(x)(y) = Some(this)
-        else {
-          println("the player died  from face unknown enemy \n")
-          space(prev_x)(y) = None
+  def movePlayer(
+  space: Array[Array[Option[SpaceObject]]], 
+  x: Int, 
+  y: Int, 
+  prev_x: Int, 
+  prev_y: Int
+): Unit = {
+  // Validate new coordinates
+  if (x < 0 || x >= space.length || y < 0 || y >= space(0).length) {
+    throw new IllegalArgumentException("Invalid coordinates")
+  }
+  
+  // Check if the new position is empty
+  if (space(x)(y).isEmpty) {
+    // Move player to new position
+    for {
+      i <- space.indices
+      j <- space(i).indices
+      if space(i)(j).contains(this)
+    } space(i)(j) = None
+    space(x)(y) = Some(this)
+  } else {
+    // Encounter with an object at the new position
+    val playerOption = space(prev_x)(prev_y)
+    val unknownObjectOption = space(x)(y)
+    
+    (playerOption, unknownObjectOption) match {
+      case (Some(player: Player[_]), Some(defender)) =>
+        println("The player has encountered an enemy or another object.")
+
+        // Perform attack if the defender is an enemy
+        val battle = performAttack(Some(player), Some(defender))
+        if (battle) {
+          // Update position if the player survived
+          space(prev_x)(prev_y) = None
+          space(x)(y) = Some(this)
+        } else {
+          // Handle player death
+          println("The player has died facing an unknown enemy.")
+          space(prev_x)(prev_y) = None
         }
 
-        
-      }
+      case (Some(_), None) =>
+        println("Encountered an object but no defender found.")
+      
+      case (None, Some(_)) =>
+        println("Player not found at previous location.")
+      
+      case (None, None) =>
+        println("Neither player nor defender found.")
     }
   }
+}
+
 
   def findPlayer(space: Array[Array[Option[SpaceObject]]]): (Int, Int) = {
     for {
@@ -148,7 +190,6 @@ class Player(val person: Option[SpaceObject], val role: String, val level: Int, 
     if (new_x < 0 || new_x >= space.length || new_y < 0 || new_y >= space(0).length) {
       throw new IllegalArgumentException("Move out of bounds")
     }
-    space(x)(y) = None
     movePlayer(space, new_x, new_y,x,y)
   }
 

@@ -24,7 +24,7 @@ class Room[T <: SpaceObject : ClassTag](width: Int, height: Int) {
 
   def get_object_by_type(object_type: String): Option[T] = {
     space.flatten.collectFirst {
-      case Some(obj) if obj.get_object_type == object_type => obj
+      case Some(obj) if obj.get_object_type == object_type => obj 
     }
   }
 
