@@ -34,6 +34,7 @@ def mapToPlayer(obj: Option[SpaceObject]): Option[Player[_ <: SpaceObject]] = {
   var action: Int = 0
   while (action != 5) {
     println("1. Move up \n2. Move down \n3. Move right \n4. Move left \n5. Exit")
+
     action = scala.io.StdIn.readInt()
     
     player match {
@@ -42,15 +43,19 @@ def mapToPlayer(obj: Option[SpaceObject]): Option[Player[_ <: SpaceObject]] = {
           case 1 => 
             p.moveUp(space.get_space)
             space.displaySpace()
+            println("\u001b[H\u001b[2J")
           case 2 => 
             p.moveDown(space.get_space)
             space.displaySpace()
+            println("\u001b[H\u001b[2J")
           case 3 => 
             p.moveRight(space.get_space)
             space.displaySpace()
+            println("\u001b[H\u001b[2J")
           case 4 => 
             p.moveLeft(space.get_space)
             space.displaySpace()
+            println("\u001b[H\u001b[2J")
           case 5 => 
             println("Exiting the game.")
             sys.exit()

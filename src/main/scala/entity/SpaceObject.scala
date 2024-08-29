@@ -1,5 +1,5 @@
 package entity
-
+import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 trait SpaceObject {
@@ -13,32 +13,59 @@ trait SpaceObject {
 
 trait CombatStyle {
  def performAttack(obj1: Option[SpaceObject], obj2: Option[SpaceObject]): Boolean = {
-  // Pattern matching to extract attacker and defender
   (obj1, obj2) match {
-    case (Some(attacker: Player[_]), Some(defender)) =>
-      println(s"${attacker.get_name} attacks ${defender.get_name}")
+    case (Some(attacker: Player[_]), Some(defender: Monster)) =>
+      if (defender.getLevel != 0.0f){
+       while (attacker.getStamina > 0 && defender.getStamina > 0) {
+        println(s"${attacker.get_name}, choose an item to attack with:")
+        for (i <- attacker.items.indices) {
+          println(s"($i) ${attacker.items(i).get_name}")
+        }
+        val choice = try {
+          scala.io.StdIn.readLine().toInt
+        } catch {
+          case _: NumberFormatException => -1
+        }
 
-      // Check if the attacker can attack the defender based on levels
-      if (attacker.getLevel >= defender.getLevel) {
-        // Calculate new stamina after the attack
-        val newStamina = attacker.getStamina - defender.action.increment_exp
+        if (choice < 0 || choice >= attacker.items.length) {
+          println("Invalid choice. Try again.")
+          
+        }
+        val sword = attacker.items(choice)
+        val damage = if (sword != null) attacker.action.increment_exp + 1 else 0
+        println(s"${attacker.get_name} attacks ${defender.get_name} with ${sword.get_name} causing $damage damage!")
+        val newStaminaDefender = defender.getStamina - damage
+        defender.setStamina(newStaminaDefender)
 
-        // Update stamina if attacker is a Player
-        attacker.setStamina(newStamina)
+        if (defender.getStamina <= 0) {
+          println(s"${defender.get_name} has been defeated!")
+          return true
+        }
+        val attackStamina = attacker.getStamina - defender.action.increment_exp
+        attacker.setStamina(attackStamina)
 
-        println(s"Attacker ${attacker.get_name} has attacked defender ${defender.get_name}")
-        true
-      } else {
-        println("Player Warning\n---------------->")
-        println("You can't attack this level\n---------------->")
-        false
+        if (attacker.getStamina <= 0) {
+          println(s"${attacker.get_name} has been defeated!")
+          return false
+        }
+        println(s"${defender.get_name} counter-attacks! ${attacker.get_name} now has ${attacker.getStamina} stamina.")
       }
+      }
+      else {
+        println(s"${defender.get_name} is wall")
+        true
+      }
+      if (attacker.getStamina < 0) false
+      else true
+  
+      
+       
 
     case (Some(_: Player[_]), None) =>
       println("Defender not found.")
       false
 
-    case (None, Some(_)) =>
+    case (None, Some(_: Monster)) =>
       println("Attacker not found.")
       false
 
@@ -48,6 +75,23 @@ trait CombatStyle {
   }
 }
 
+
+def pickItem(player: Option[SpaceObject], Item :Option[SpaceObject]) : Unit = {
+  (player, Item) match {
+    case (Some(player: Player[_]), Some(item: Item)) =>
+      println(s"${player.get_name} picked ${item.get_name}")
+      player.addItem(item)
+      if (item.name == "sword") {
+        println("Congratulations! You found a sword!")
+        player.setStamina(player.getStamina +10 )
+        player.setLevel(player.getLevel +1)
+      }
+      item.set_owner(Some(player))
+    case (Some(_), None) =>
+      println("Item not found.")
+  }
+
+}
 } 
 
 class Move(val name: String, val increment_exp: Int = 0)
@@ -68,6 +112,8 @@ case class Item(name: String) extends SpaceObject {
   override def getExp: Float = 0.0f
   override def getStamina: Int = 0
   override def action: Move = new Move("None")
+  var owner: Option[SpaceObject] = None
+  def set_owner(_owner: Option[SpaceObject]): Unit = this.owner = _owner
 }
 
 case class Wall(level: Int) extends SpaceObject {
@@ -81,7 +127,7 @@ case class Wall(level: Int) extends SpaceObject {
   override def action: Move = new Move("Block", how_many_increasing)
 }
 
-case class Monster(name: String, level: Int, exp: Float, stamina: Int = 5) extends SpaceObject {
+case class Monster(name: String, level: Int, exp: Float,var  stamina: Int = 5) extends SpaceObject {
   val moves: List[Move] = List(
     new Move("EnergyBlast", 3),
     new Move("FlashStrike", 1),
@@ -93,20 +139,31 @@ case class Monster(name: String, level: Int, exp: Float, stamina: Int = 5) exten
   override def getLevel: Int = level
   override def getExp: Float = exp
   override def getStamina: Int = stamina
+  def setStamina(_stamina: Int ) :Unit = {
+    this.stamina = _stamina
+  }  
   override def action: Move = moves(Random.nextInt(moves.size))
 }
 
-class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String, val level: Int, val reward: List[Float]=List[Float](), var stamina: Int = 10) extends SpaceObject  ,CombatStyle{
+class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String, var level: Int, val reward: List[Float]=List[Float](), var stamina: Int = 10) extends SpaceObject  ,CombatStyle
+{
+  
+  
   val moves: List[Move] = List(
     new Move("EnergyBlast", 3),
     new Move("FlashStrike", 1),
     new Move("PhotonWave", 2)
   )
+  val items : ListBuffer[Item] = ListBuffer()
+  def addItem(item: Item): Unit = {
+    items += item
+  }
   
   override def action: Move = moves(Random.nextInt(moves.size))
   override def getLevel: Int = level
   override def getExp: Float = reward.sum
   override def getStamina: Int = stamina
+  def setLevel(level: Int) :Unit = this.level = level
 
   def setStamina(s: Int): Unit = {
     this.stamina = s
@@ -144,19 +201,26 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
     
     (playerOption, unknownObjectOption) match {
       case (Some(player: Player[_]), Some(defender)) =>
+        if (defender.get_object_type !="Item") {
         println("The player has encountered an enemy or another object.")
-
-        // Perform attack if the defender is an enemy
         val battle = performAttack(Some(player), Some(defender))
         if (battle) {
-          // Update position if the player survived
           space(prev_x)(prev_y) = None
           space(x)(y) = Some(this)
         } else {
-          // Handle player death
           println("The player has died facing an unknown enemy.")
           space(prev_x)(prev_y) = None
         }
+        }else {
+          println("The player has encountered an item.")
+          pickItem (Some(player) ,Some(defender))
+          for (i<- 0 until player.items.size) {
+            println(s"Player picked ${player.items(i).get_name}")
+          }
+          space(prev_x)(prev_y) = space(x)(y)
+          space(x)(y) = Some(this)
+        }
+      
 
       case (Some(_), None) =>
         println("Encountered an object but no defender found.")
