@@ -6,7 +6,9 @@ import scala.util.Random
 class Room[T <: SpaceObject : ClassTag](width: Int, height: Int) {
   private var  space: Array[Array[Option[T]]] = Array.fill(width, height)(None)
   def get_space :Array[Array[Option[T]]] = space
-
+  def reset_space (): Unit ={
+    this.space=Array.fill(width, height)(None)
+  }
   def place_object_random(obj: T): Unit = {
     val emptyCells = for {
       x <- space.indices

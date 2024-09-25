@@ -1,5 +1,6 @@
 package entity
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 import scala.util.Random
 
 trait SpaceObject {
@@ -10,13 +11,13 @@ trait SpaceObject {
   def getStamina: Int
   def action: Move
 }
-
+// agent go through the grid with some random up down  and if he face wall he get -1 and 1 if he found the exit door
 trait CombatStyle {
  def performAttack(obj1: Option[SpaceObject], obj2: Option[SpaceObject]): Boolean = {
   (obj1, obj2) match {
     case (Some(attacker: Player[_]), Some(defender: Monster)) =>
-      if (defender.getLevel != 0.0f){
        while (attacker.getStamina > 0 && defender.getStamina > 0) {
+
         println(s"${attacker.get_name}, choose an item to attack with:")
         for (i <- attacker.items.indices) {
           println(s"($i) ${attacker.items(i).get_name}")
@@ -50,16 +51,16 @@ trait CombatStyle {
         }
         println(s"${defender.get_name} counter-attacks! ${attacker.get_name} now has ${attacker.getStamina} stamina.")
       }
-      }
-      else {
-        println(s"${defender.get_name} is wall")
-        true
-      }
+      
+     
       if (attacker.getStamina < 0) false
       else true
   
       
        
+    case (Some(attacker: Player[_]), Some(_: Item)) =>
+      println("Defender is Wall")
+      true
 
     case (Some(_: Player[_]), None) =>
       println("Defender not found.")
@@ -69,13 +70,9 @@ trait CombatStyle {
       println("Attacker not found.")
       false
 
-    case _ =>
-      println("Both attacker and defender not found.")
-      false
+   
   }
 }
-
-
 def pickItem(player: Option[SpaceObject], Item :Option[SpaceObject]) : Unit = {
   (player, Item) match {
     case (Some(player: Player[_]), Some(item: Item)) =>
@@ -92,6 +89,8 @@ def pickItem(player: Option[SpaceObject], Item :Option[SpaceObject]) : Unit = {
   }
 
 }
+
+
 } 
 
 class Move(val name: String, val increment_exp: Int = 0)
@@ -145,7 +144,7 @@ case class Monster(name: String, level: Int, exp: Float,var  stamina: Int = 5) e
   override def action: Move = moves(Random.nextInt(moves.size))
 }
 
-class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String, var level: Int, val reward: List[Float]=List[Float](), var stamina: Int = 10) extends SpaceObject  ,CombatStyle
+class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String, var level: Int, var reward: List[Float]=List[Float](), var stamina: Int = 10) extends SpaceObject  ,CombatStyle
 {
   
   
@@ -154,11 +153,14 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
     new Move("FlashStrike", 1),
     new Move("PhotonWave", 2)
   )
+  var memory_steps :Map[(Int,Int),Option[SpaceObject]] = Map[(Int,Int),Option[SpaceObject]]()
+  def get_memory_steps:Map[(Int,Int),Option[SpaceObject]]=memory_steps
   val items : ListBuffer[Item] = ListBuffer()
   def addItem(item: Item): Unit = {
     items += item
   }
-  
+  def get_reward :List[Float] = reward
+  def get_cum_reward :Float =reward.sum
   override def action: Move = moves(Random.nextInt(moves.size))
   override def getLevel: Int = level
   override def getExp: Float = reward.sum
@@ -168,6 +170,10 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
   def setStamina(s: Int): Unit = {
     this.stamina = s
   }
+  val agentActions = Map("up" -> (-1, 0), "down" -> (1, 0), "left" -> (0, -1), "right" -> (0, 1))
+
+  def getAgentActions: Map[String, (Int, Int)] = agentActions
+
 
   override def get_name: String = person.map(_.get_name).getOrElse("Unknown")
   println(f"Player name is ${get_name} and role is ${role} and level is ${level}")
@@ -193,14 +199,20 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
       j <- space(i).indices
       if space(i)(j).contains(this)
     } space(i)(j) = None
+    
+    memory_steps((x,y))=None
+    println("Player moved to a new position. with empty space")
     space(x)(y) = Some(this)
+    reward = -0.01 :: reward
+
   } else {
     // Encounter with an object at the new position
     val playerOption = space(prev_x)(prev_y)
     val unknownObjectOption = space(x)(y)
     
     (playerOption, unknownObjectOption) match {
-      case (Some(player: Player[_]), Some(defender)) =>
+      /*
+      case (Some(player: Player[_]), Some(defender:Monster)) =>
         if (defender.get_object_type !="Item") {
         println("The player has encountered an enemy or another object.")
         val battle = performAttack(Some(player), Some(defender))
@@ -209,7 +221,7 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
           space(x)(y) = Some(this)
         } else {
           println("The player has died facing an unknown enemy.")
-          space(prev_x)(prev_y) = None
+          //space(prev_x)(prev_y) = None
         }
         }else {
           println("The player has encountered an item.")
@@ -220,7 +232,19 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
           space(prev_x)(prev_y) = space(x)(y)
           space(x)(y) = Some(this)
         }
+      */
+
       
+      
+      case (Some(player: Player[_]), Some(defender:Wall)) =>
+        
+        println("Agent face  A wall ")
+        reward = -1 :: reward
+      case (Some(player:Player[_]),Some(defender:Item)) =>
+        println(s"Agent found an item :${defender.get_name}")
+        space(prev_x)(prev_y) = None
+        space(x)(y) = Some(this)
+        reward = 10 :: reward
 
       case (Some(_), None) =>
         println("Encountered an object but no defender found.")
@@ -233,8 +257,9 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
     }
   }
 }
-
-
+  
+  
+  
   def findPlayer(space: Array[Array[Option[SpaceObject]]]): (Int, Int) = {
     for {
       i <- space.indices
@@ -244,32 +269,30 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
 
     throw new IllegalStateException("Player not found")
   }
-
-  def move(space: Array[Array[Option[SpaceObject]]], deltaX: Int, deltaY: Int): Unit = {
+  def setReward() :Unit  ={
+   reward =List[Float]()
+  }
+  def isValidMove(space: Array[Array[Option[SpaceObject]]], new_x: Int, new_y: Int) :Boolean ={
+    if (new_x < 0 || new_x >= space.length || new_y < 0 || new_y >= space(0).length) {
+     reward = -1.1 :: reward
+     return false
+    }
+    return true 
+  }
+  def move(space: Array[Array[Option[SpaceObject]]],action:String): Unit = {
     // the previous position
     val (x, y) = findPlayer(space)
+    val (deltaX, deltaY) = agentActions(action)
     val new_x = x + deltaX
     val new_y = y + deltaY
-
-    if (new_x < 0 || new_x >= space.length || new_y < 0 || new_y >= space(0).length) {
-      throw new IllegalArgumentException("Move out of bounds")
+  
+    if (isValidMove(space,new_x,new_y)){
+     movePlayer(space, new_x, new_y,x,y)
+    }else {
+      println(action)
     }
-    movePlayer(space, new_x, new_y,x,y)
+    
   }
 
-  def moveUp(space: Array[Array[Option[SpaceObject]]]): Unit = {
-    move(space, -1, 0)
-  }
-
-  def moveLeft(space: Array[Array[Option[SpaceObject]]]): Unit = {
-    move(space, 0, -1)
-  }
-
-  def moveRight(space: Array[Array[Option[SpaceObject]]]): Unit = {
-    move(space, 0, 1)
-  }
-
-  def moveDown(space: Array[Array[Option[SpaceObject]]]): Unit = {
-    move(space, 1, 0)
-  }
+  
 }
