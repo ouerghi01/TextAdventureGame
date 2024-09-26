@@ -153,6 +153,8 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
     new Move("FlashStrike", 1),
     new Move("PhotonWave", 2)
   )
+  var current_reward :Float = 0.0f
+  def get_current_reward :Float = current_reward
   var memory_steps :Map[(Int,Int),Option[SpaceObject]] = Map[(Int,Int),Option[SpaceObject]]()
   def get_memory_steps:Map[(Int,Int),Option[SpaceObject]]=memory_steps
   val items : ListBuffer[Item] = ListBuffer()
@@ -204,6 +206,7 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
     println("Player moved to a new position. with empty space")
     space(x)(y) = Some(this)
     reward = -0.01 :: reward
+    current_reward= - 0.01
 
   } else {
     // Encounter with an object at the new position
@@ -240,11 +243,13 @@ class Player[T <: SpaceObject](val person: Option[SpaceObject], val role: String
         
         println("Agent face  A wall ")
         reward = -1 :: reward
+        current_reward = -1
       case (Some(player:Player[_]),Some(defender:Item)) =>
         println(s"Agent found an item :${defender.get_name}")
         space(prev_x)(prev_y) = None
         space(x)(y) = Some(this)
         reward = 10 :: reward
+        current_reward = 10
 
       case (Some(_), None) =>
         println("Encountered an object but no defender found.")
