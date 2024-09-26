@@ -3,7 +3,7 @@ import entity.SpaceObject as SpaceObject
 import scala.util.Random
 import entity.Room as Room
 import scala.collection.mutable.Map
-
+import scala.concurrent.duration._
 import entity.{Person, Item,Player,Wall,Monster}
 def mapToPlayer(obj: Option[SpaceObject]): Option[Player[_ <: SpaceObject]] = {
   obj match {
@@ -60,7 +60,9 @@ def reset_env(space :Room[SpaceObject]) :Unit = {
               action =Random.shuffle(p.agentActions.keys).head
               actions= action :: actions
               p.move(space.get_space, action)
+              print("\u001b[2J")
               space.displaySpace()
+              Thread.sleep(500)
               reward = p.get_cum_reward
               if (p.get_reward.contains(10) ){
                 
@@ -87,7 +89,25 @@ def reset_env(space :Room[SpaceObject]) :Unit = {
     val max_ks = ks.map(k => k.sum).max
     ks= ks.filter(k => k.sum == max_ks )
     for (k <- ks){
-      println(observations(k))
+      val actions_test= observations(k)
+      var test_agent: Option[Player[_ <: SpaceObject]]  = initialize_env(space)
+      println("The best path is :")
+      test_agent match
+        case Some(p) =>{
+          for (action <- actions_test){
+        p.move(space.get_space, action)
+        print("\u001b[2J")
+        space.displaySpace()
+        Thread.sleep(2000)
+        
+      }
+
+        }
+      
+      
+      
+      
+
     }
 
     println()
